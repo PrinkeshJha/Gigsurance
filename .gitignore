@@ -44,3 +44,5 @@ Thumbs.db
 # Temporary
 *.tmp
 *.temp
+
+project_analysis.txt
