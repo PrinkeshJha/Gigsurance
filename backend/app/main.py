@@ -21,6 +21,10 @@ from app.routes.payments import router as payments_router
 from app.routes.premium import router as premium_router
 from app.routes.location import router as location_router
 from app.routes.fraud import router as fraud_router
+from app.routes.delivery import router as delivery_router
+from app.routes.zone import router as zone_router
+from app.routes.payout_jobs import router as payout_jobs_router
+from app.routes.alerts import router as alerts_router
 
 import app.db.database as database
 from app.scheduler import init_scheduler, start_scheduler, shutdown_scheduler
@@ -166,6 +170,10 @@ app.include_router(admin_router, prefix="/admin")
 app.include_router(premium_router, prefix="/premium")
 app.include_router(location_router) # Uses internal prefix
 app.include_router(fraud_router) # Uses internal prefix
+app.include_router(delivery_router) # Uses internal prefix
+app.include_router(zone_router) # Uses internal prefix
+app.include_router(payout_jobs_router) # Uses internal prefix
+app.include_router(alerts_router) # Uses internal prefix
 
 # ===============================
 

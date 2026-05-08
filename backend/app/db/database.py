@@ -26,6 +26,11 @@ premium_history_collection = None
 payouts_collection = None
 notifications_collection = None
 meta_collection = None
+delivery_logs_collection = None
+zones_collection = None
+payout_jobs_collection = None
+fraud_logs_collection = None
+alerts_collection = None
 
 
 # -------------------------------
@@ -36,7 +41,8 @@ async def connect_to_mongo():
     global users_collection, policies_collection, subscriptions_collection
     global trigger_logs_collection, payouts_collection, notifications_collection
     global triggers_collection, premium_history_collection
-    global meta_collection
+    global meta_collection, delivery_logs_collection, zones_collection
+    global payout_jobs_collection, fraud_logs_collection, alerts_collection
 
     try:
         client = AsyncIOMotorClient(
@@ -57,6 +63,11 @@ async def connect_to_mongo():
         payouts_collection = db["payouts"]
         notifications_collection = db["notifications"]
         meta_collection = db["meta_locations"]
+        delivery_logs_collection = db["delivery_logs"]
+        zones_collection = db["zones"]
+        payout_jobs_collection = db["payout_jobs"]
+        fraud_logs_collection = db["fraud_logs"]
+        alerts_collection = db["alerts"]
 
         # Ping DB
         await client.admin.command("ping")
@@ -147,6 +158,26 @@ async def create_indexes():
             [("user_id", 1), ("week_start", 1)],
             name="subscription_user_week_idx",
             unique=True
+        )
+
+        await delivery_logs_collection.create_index(
+            [("user_id", 1), ("timestamp", -1)],
+            name="delivery_log_user_time_idx"
+        )
+        
+        await payout_jobs_collection.create_index(
+            [("status", 1)],
+            name="payout_job_status_idx"
+        )
+        
+        await fraud_logs_collection.create_index(
+            [("user_id", 1)],
+            name="fraud_log_user_idx"
+        )
+        
+        await alerts_collection.create_index(
+            [("zone_id", 1), ("forecast_time", 1)],
+            name="alerts_zone_time_idx"
         )
 
         await trigger_logs_collection.create_index(

@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     razorpay_key_secret: Optional[str] = None
 
     # ===============================
+    # REDIS / CELERY
+    # ===============================
+    redis_url: str = "redis://localhost:6379/0"
+    celery_broker_url: str = "redis://localhost:6379/0"
+
+    # ===============================
     # ENVIRONMENT
     # ===============================
     debug: bool = False

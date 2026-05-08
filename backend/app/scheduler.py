@@ -4,6 +4,8 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from app.services.trigger_engine import run_trigger_check
 from app.services.premium_service import update_all_user_premiums
+from app.services.deduction_service import reset_weekly_deductions
+from app.services.predictive_alert_service import predict_weather_disruptions
 
 logger = logging.getLogger("gigsurance-backend")
 
@@ -36,6 +38,27 @@ def init_scheduler():
         hour=0,
         minute=1,
         id="weekly_premium_update",
+        max_instances=1,
+        replace_existing=True
+    )
+
+    # Weekly deduction reset and top-up
+    scheduler.add_job(
+        reset_weekly_deductions,
+        trigger="cron",
+        day_of_week="mon",
+        hour=0,
+        minute=1,
+        id="weekly_deduction_reset",
+        max_instances=1,
+        replace_existing=True
+    )
+
+    # Predictive weather alerts every 6 hours
+    scheduler.add_job(
+        predict_weather_disruptions,
+        trigger=IntervalTrigger(hours=6),
+        id="predictive_weather_alerts",
         max_instances=1,
         replace_existing=True
     )

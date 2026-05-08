@@ -6,6 +6,7 @@ from typing import Tuple, Optional, List
 from app.config import settings
 import app.db.database as database
 from app.services import location_service, payout_service
+from app.tasks.payout_tasks import process_payout_task
 
 logger = logging.getLogger("gigsurance-backend")
 
@@ -22,19 +23,28 @@ async def get_all_cities() -> List[str]:
 # MAIN TRIGGER CHECK
 # -------------------------------
 async def run_trigger_check():
-    """Run trigger check for all cities."""
-    cities = await get_all_cities()
+    """Run trigger check for all zones."""
+    if not database.zones_collection:
+        return
+        
+    zones = await database.zones_collection.find({}).to_list(length=None)
 
-    for city in cities:
+    for zone in zones:
+        zone_id = str(zone["_id"])
+        zone_name = zone.get("name", "Unknown Zone")
+        lat = zone.get("center", {}).get("lat", 0.0)
+        lon = zone.get("center", {}).get("lon", 0.0)
+        
         try:
-            weather = await fetch_openweather(city)
+            weather = await fetch_openweather_by_coords(lat, lon)
             temp = weather["main"]["temp"]
             rain = weather.get("rain", {}).get("1h", 0.0)
 
             heat_triggered = temp > 45.0
             rain_triggered = rain > 12.0
 
-            news_triggered, headline = await fetch_news_trigger(city)
+            # Using zone name for news check as fallback
+            news_triggered, headline = await fetch_news_trigger(zone_name)
 
             for condition, trigger_type, value, headline_text in [
                 (heat_triggered, "heat", temp, None),
@@ -42,24 +52,24 @@ async def run_trigger_check():
                 (news_triggered, "civil", None, headline),
             ]:
                 if condition:
-                    await process_trigger(city, trigger_type, value, headline_text)
+                    await process_trigger(zone_id, trigger_type, value, headline_text, zone)
 
         except Exception as e:
-            logger.error(f"Trigger check failed for {city}: {e}")
+            logger.error(f"Trigger check failed for zone {zone_id}: {e}")
 
 
 # -------------------------------
 # WEATHER
 # -------------------------------
-def _fallback_weather_data(city: str):
+def _fallback_weather_data():
     return {"main": {"temp": 30.0}, "rain": {}}
 
 
-async def fetch_openweather(city: str):
+async def fetch_openweather_by_coords(lat: float, lon: float):
     if not settings.openweather_api_key or settings.openweather_api_key.startswith("dummy"):
-        return _fallback_weather_data(city)
+        return _fallback_weather_data()
 
-    url = f"https://api.openweathermap.org/data/2.5/weather?q={city},IN&appid={settings.openweather_api_key}&units=metric"
+    url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={settings.openweather_api_key}&units=metric"
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -67,7 +77,7 @@ async def fetch_openweather(city: str):
             res.raise_for_status()
             return res.json()
     except Exception:
-        return _fallback_weather_data(city)
+        return _fallback_weather_data()
 
 
 # -------------------------------
@@ -103,15 +113,24 @@ async def fetch_news_trigger(city: str) -> Tuple[bool, Optional[str]]:
 # -------------------------------
 # PROCESS TRIGGER
 # -------------------------------
-async def process_trigger(city: str, trigger_type: str, trigger_value, headline):
+async def process_trigger(zone_id: str, trigger_type: str, trigger_value, headline, zone_obj: dict):
     now = datetime.utcnow()
     date_str = now.strftime("%Y-%m-%d")
 
     try:
         triggers_collection = database.get_triggers_collection()
+        # Prevent duplicates for the same zone, type, and date
+        existing = await triggers_collection.find_one({
+            "zone_id": zone_id,
+            "type": trigger_type,
+            "date": date_str
+        })
+        if existing:
+            return
+
         result = await triggers_collection.insert_one({
             "type": trigger_type,
-            "city": city,
+            "zone_id": zone_id,
             "date": date_str,
             "value": trigger_value,
             "news_headline": headline,
@@ -122,107 +141,53 @@ async def process_trigger(city: str, trigger_type: str, trigger_value, headline)
         await process_daily_trigger({
             "_id": result.inserted_id,
             "type": trigger_type,
-            "city": city,
+            "zone_id": zone_id,
             "date": date_str,
-            "value": trigger_value
+            "value": trigger_value,
+            "location": zone_obj.get("center"),
+            "radius_km": zone_obj.get("radius_km", 5.0),
+            "zone_name": zone_obj.get("name", "Unknown Zone")
         })
     except Exception as e:
-        if "duplicate key error" in str(e).lower() or "11000" in str(e):
-            pass # Duplicate trigger for today
-        else:
-            logger.error(f"Error inserting trigger for {city}: {e}")
+        logger.error(f"Error inserting trigger for zone {zone_id}: {e}")
 
 
 # -------------------------------
 # PAYOUT PROCESSING
 # -------------------------------
 async def process_daily_trigger(trigger: dict):
-    city = trigger["city"]
+    zone_id = trigger["zone_id"]
     trigger_type = trigger["type"]
     trigger_id = trigger["_id"]
     trigger_date = trigger["date"]
     trigger_timestamp = trigger.get("timestamp", datetime.utcnow())
+    zone_name = trigger.get("zone_name", zone_id)
 
-    # Assuming a static trigger location for the city, or passed in the trigger data
+    # Use trigger zone center directly
     trigger_location = trigger.get("location", {"lat": 23.0225, "lon": 72.5714})
+    radius_km = trigger.get("radius_km", 5.0)
+
+    # Ensure Celery task receives serializable data
+    trigger_data = {
+        "location": trigger_location,
+        "radius_km": radius_km,
+        "type": trigger_type,
+        "date": trigger_date,
+        "timestamp": trigger_timestamp.isoformat(),
+        "zone_name": zone_name
+    }
 
     users = await database.users_collection.find({
-        "city": city,
+        "zone_id": zone_id,
         "is_onboarded": True
     }).to_list(length=None)
 
     for user in users:
-        policy = await database.policies_collection.find_one({
-            "user_id": str(user["_id"]),
-            "status": "active"
-        })
-
-        if not policy or trigger_type not in policy.get("coverage", []):
-            continue
-
-        already_paid = await database.payouts_collection.find_one({
-            "user_id": user["_id"],
-            "trigger_id": str(trigger_id)
-        })
-
-        if already_paid:
-            continue
-
-        # Fraud Check
-        fraud_status, reason = location_service.check_location_validity(user, trigger_location, radius_km=5.0)
-
-        payout_amount = 0.0
-        lost_hours = 0.0
-
-        if fraud_status in ("passed", "manual_review"):
-            risk_score = float(user.get("risk_score", 50.0))
-            payout_result = payout_service.calculate_payout(user, policy, trigger_timestamp, risk_score)
-            
-            if payout_result["status"] == "rejected":
-                if payout_result["reason"] in ("after_work_hours", "no_lost_hours"):
-                    continue # Skip silently if it's out of hours
-                # If rejected for other reasons, keep 0 payout but log it
-            else:
-                payout_amount = payout_result["amount"]
-                lost_hours = payout_result["lost_hours"]
-        else:
-            logger.info(f"User {user['_id']} failed fraud check: {reason}")
-
-        if fraud_status == "passed" and payout_amount <= 0:
-            continue
-
-        # Store Payout
-        await database.payouts_collection.insert_one({
-            "user_id": user["_id"],
-            "policy_id": policy["_id"],
-            "trigger_id": str(trigger_id),
-            "trigger_date": trigger_date,
-            "amount": payout_amount,
-            "lost_hours": lost_hours,
-            "trigger_type": trigger_type,
-            "status": "credited" if fraud_status == "passed" else "pending",
-            "fraud_status": fraud_status,
-            "reason": reason,
-            "created_at": datetime.utcnow()
-        })
-
-        # Notifications
-        if fraud_status == "passed":
-            await database.notifications_collection.insert_one({
-                "user_id": user["_id"],
-                "message": f"₹{payout_amount} credited due to {trigger_type} in {city}",
-                "type": "payout",
-                "read": False,
-                "created_at": datetime.utcnow()
-            })
-        elif fraud_status == "manual_review":
-            await database.notifications_collection.insert_one({
-                "user_id": user["_id"],
-                "message": f"Your payout for {trigger_type} in {city} is under manual review.",
-                "type": "payout",
-                "read": False,
-                "created_at": datetime.utcnow()
-            })
+        # Dispatch to queue instead of processing synchronously
+        try:
+            process_payout_task.delay(str(user["_id"]), str(trigger_id), trigger_data)
+        except Exception as e:
+            logger.error(f"Failed to queue payout task for user {user['_id']}: {e}")
 
 
 # -------------------------------
