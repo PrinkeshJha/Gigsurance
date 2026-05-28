@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from app.services.risk_engine import calculate_risk_details, _get_seasonal_multiplier
 from app.services.trigger_engine import calculate_payout_amount, parse_working_hours
 
@@ -32,18 +32,18 @@ def test_payout_calculation():
         "working_hours": "10:00-20:00"
     }
     
-    # Force UTC hour for testing since calculate_payout_amount uses datetime.utcnow().hour
-    current_utc_hour = datetime.utcnow().hour
+    # calculate_payout_amount converts UTC to IST (+5:30) internally
+    current_ist_hour = (datetime.utcnow() + timedelta(hours=5, minutes=30)).hour
     
     payout = calculate_payout_amount(user, policy)
     
     start, end = parse_working_hours(user["working_hours"])
-    expected_remaining = max(0, end - current_utc_hour)
+    expected_remaining = max(0, end - current_ist_hour)
     
     # 1000 / (5 * 10) = 20 per hour
     expected_payout = 20 * expected_remaining
     
-    print(f"Current UTC Hour: {current_utc_hour}")
+    print(f"Current IST Hour: {current_ist_hour}")
     print(f"Expected Remaining Hours: {expected_remaining}")
     print(f"Calculated Payout: Rs.{payout}")
     print(f"Expected Payout: Rs.{expected_payout}")
