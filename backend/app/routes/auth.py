@@ -100,6 +100,15 @@ async def login(payload: LoginRequest):
 # -------------------------------
 
 def format_user_response(user: Dict[str, Any]) -> Dict[str, Any]:
+    from datetime import datetime
+    kyc_verified_at = user.get("kyc_verified_at")
+    if isinstance(kyc_verified_at, datetime):
+        kyc_verified_at_str = kyc_verified_at.isoformat()
+    elif isinstance(kyc_verified_at, str):
+        kyc_verified_at_str = kyc_verified_at
+    else:
+        kyc_verified_at_str = None
+
     return {
         "id": str(user.get("_id", "")),
         "name": user.get("name", ""),
@@ -112,8 +121,12 @@ def format_user_response(user: Dict[str, Any]) -> Dict[str, Any]:
         "working_hours": user.get("working_hours", ""),
         "role": user.get("role", "user"),
         "is_onboarded": bool(user.get("is_onboarded", False)),
-        "risk_score": int(user.get("risk_score", 0)),
-        "weekly_premium": int(user.get("weekly_premium", 0)),
+        "risk_score": float(user.get("risk_score", 0)),
+        "weekly_premium": float(user.get("weekly_premium", 0)),
+        "kyc_status": user.get("kyc_status", "uninitiated"),
+        "kyc_verified_at": kyc_verified_at_str,
+        "kyc_document_type": user.get("kyc_document_type"),
+        "kyc_document_ref": user.get("kyc_document_ref"),
     }
 
 # -------------------------------

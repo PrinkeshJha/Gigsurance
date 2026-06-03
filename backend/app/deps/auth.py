@@ -58,3 +58,20 @@ async def get_current_admin(user: dict = Depends(get_current_user)):
             detail="Admin privileges required"
         )
     return user
+
+
+# -------------------------------
+# ROLE BASED ACCESS CONTROL (RBAC)
+# -------------------------------
+def check_role(allowed_roles: list[str]):
+    async def dependency(user: dict = Depends(get_current_user)):
+        role = user.get("role", "user")
+        if role == "admin":
+            return user
+        if role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Operation not authorized for your role"
+            )
+        return user
+    return dependency

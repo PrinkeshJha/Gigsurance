@@ -8,7 +8,7 @@ async def get_payout_jobs():
     """
     Queue monitoring: List all recent payout processing jobs.
     """
-    if not database.payout_jobs_collection:
+    if database.payout_jobs_collection is None:
         return {"status": "error", "message": "Queue collection not initialized"}
         
     cursor = database.payout_jobs_collection.find({}).sort("created_at", -1)

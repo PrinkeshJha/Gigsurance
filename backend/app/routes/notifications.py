@@ -17,7 +17,7 @@ async def get_notifications(user=Depends(get_current_user)):
     try:
         notifications_collection = database.notifications_collection
 
-        if not notifications_collection:
+        if notifications_collection is None:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Database not initialized"
@@ -31,8 +31,13 @@ async def get_notifications(user=Depends(get_current_user)):
                 detail="Invalid user"
             )
 
+        from bson import ObjectId
+        user_ids = [user_id]
+        if ObjectId.is_valid(user_id):
+            user_ids.append(ObjectId(user_id))
+
         notifications = await notifications_collection.find(
-            {"user_id": user_id},
+            {"user_id": {"$in": user_ids}},
             sort=[("created_at", -1)]
         ).to_list(length=None)
 
@@ -71,7 +76,7 @@ async def mark_notifications_read(user=Depends(get_current_user)):
     try:
         notifications_collection = database.notifications_collection
 
-        if not notifications_collection:
+        if notifications_collection is None:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Database not initialized"
@@ -85,8 +90,13 @@ async def mark_notifications_read(user=Depends(get_current_user)):
                 detail="Invalid user"
             )
 
+        from bson import ObjectId
+        user_ids = [user_id]
+        if ObjectId.is_valid(user_id):
+            user_ids.append(ObjectId(user_id))
+
         result = await notifications_collection.update_many(
-            {"user_id": user_id, "read": False},
+            {"user_id": {"$in": user_ids}, "read": False},
             {"$set": {"read": True}}
         )
 

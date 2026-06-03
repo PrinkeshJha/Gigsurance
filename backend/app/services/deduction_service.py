@@ -21,7 +21,10 @@ async def process_delivery(user_id: str, earnings: float) -> dict:
         
     if not user.get("is_onboarded", False):
         return {"status": "skipped", "reason": "user_inactive"}
-        
+
+    if user.get("kyc_status", "uninitiated") != "verified":
+        return {"status": "skipped", "reason": "kyc_not_verified"}
+
     weekly_cap = float(user.get("weekly_cap", 0.0))
     expected_deliveries = int(user.get("expected_deliveries_per_week", 40))
     deducted_amount = float(user.get("deducted_amount", 0.0))
@@ -78,7 +81,7 @@ async def reset_weekly_deductions():
     Resets stats.
     """
     logger.info("Starting weekly deduction reset and top-up...")
-    if not database.users_collection:
+    if database.users_collection is None:
         return
         
     users = await database.users_collection.find({"is_onboarded": True}).to_list(length=None)
@@ -90,6 +93,9 @@ async def reset_weekly_deductions():
         remaining = weekly_cap - deducted_amount
         
         if remaining > 0 and weekly_cap > 0:
+            if user.get("kyc_status", "uninitiated") != "verified":
+                logger.warning(f"Skipping auto-charge for user {user['_id']} - KYC not verified.")
+                continue
             # TODO: Auto-charge via Razorpay here
             logger.info(f"Auto-charging user {user['_id']} for remaining premium: Rs.{remaining}")
             # Mock successful Razorpay call:

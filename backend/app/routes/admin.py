@@ -18,7 +18,7 @@ async def get_admin_kpis(admin=Depends(get_current_admin)):
         users_collection = database.users_collection
         payouts_collection = database.payouts_collection
 
-        if not users_collection or not payouts_collection:
+        if users_collection is None or payouts_collection is None:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Database not initialized"

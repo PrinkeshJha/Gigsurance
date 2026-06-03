@@ -7,7 +7,7 @@ logger = logging.getLogger("gigsurance-backend.zone")
 
 async def get_all_zones():
     """Fetch all zones from the database"""
-    if not database.zones_collection:
+    if database.zones_collection is None:
         return []
     return await database.zones_collection.find({}).to_list(length=None)
 

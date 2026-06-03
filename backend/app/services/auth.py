@@ -59,6 +59,10 @@ async def register_user(payload: RegisterRequest):
         "weekly_premium": 0,
         "created_at": datetime.utcnow(),
         "hashed_password": hash_password(payload.password),
+        "kyc_status": "uninitiated",
+        "kyc_verified_at": None,
+        "kyc_document_type": None,
+        "kyc_document_ref": None,
     }
 
     result = await users_collection.insert_one(user_doc)
@@ -148,9 +152,14 @@ async def complete_onboarding(user: dict, payload: OnboardingCompleteRequest):
     user_id = str(user["_id"])
     now = datetime.utcnow()
 
+    # Get updated user info or check user parameter
+    user_db = await users_collection.find_one({"_id": user["_id"]})
+    user_kyc = user_db.get("kyc_status", "uninitiated") if user_db else "uninitiated"
+    policy_status = "active" if user_kyc == "verified" else "pending_kyc"
+
     policy_doc = {
         "user_id": user_id,
-        "status": "active",
+        "status": policy_status,
         "weekly_premium": payload.weekly_premium,
         "risk_score": payload.risk_score,
         "coverage": ["heat", "rain", "civil"],

@@ -20,7 +20,7 @@ async def record_delivery(user=Depends(get_current_user)):
         subscriptions_collection = database.subscriptions_collection
         policies_collection = database.policies_collection
 
-        if not subscriptions_collection or not policies_collection:
+        if subscriptions_collection is None or policies_collection is None:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Database not initialized"
@@ -109,7 +109,7 @@ async def get_subscription_status(user=Depends(get_current_user)):
     try:
         subscriptions_collection = database.subscriptions_collection
 
-        if not subscriptions_collection:
+        if subscriptions_collection is None:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Database not initialized"

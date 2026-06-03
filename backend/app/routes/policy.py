@@ -64,6 +64,12 @@ async def toggle_policy(payload: PolicyToggleRequest, user=Depends(get_current_u
                 detail="Invalid user session"
             )
 
+        if payload.active and user.get("kyc_status", "uninitiated") != "verified":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="KYC verification is required to activate policy."
+            )
+
         user_id_str = str(user_id)
 
         policy = await toggle_policy_status(user_id_str, payload.active)

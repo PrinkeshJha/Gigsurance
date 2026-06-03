@@ -49,6 +49,11 @@ class UserResponse(BaseModel):
     risk_score: float = 0.0          # ✅ FIXED
     weekly_premium: float = 0.0      # ✅ FIXED
 
+    kyc_status: str = "uninitiated"
+    kyc_verified_at: Optional[str] = None
+    kyc_document_type: Optional[str] = None
+    kyc_document_ref: Optional[str] = None
+
 
 # -------------------------------
 # META

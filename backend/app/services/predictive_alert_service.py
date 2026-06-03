@@ -12,7 +12,7 @@ async def predict_weather_disruptions():
     within the next 48 hours.
     """
     logger.info("Running predictive weather alert job...")
-    if not database.zones_collection:
+    if database.zones_collection is None:
         return
         
     zones = await database.zones_collection.find({}).to_list(length=None)

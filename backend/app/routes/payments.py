@@ -14,7 +14,7 @@ logger = logging.getLogger("gigsurance-backend")
 router = APIRouter(tags=["payments"])
 
 
-print("🔥 PAYMENTS ROUTE LOADED")
+print("PAYMENTS ROUTE LOADED")
 
 # -------------------------------
 

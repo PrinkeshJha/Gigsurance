@@ -24,7 +24,7 @@ async def get_all_cities() -> List[str]:
 # -------------------------------
 async def run_trigger_check():
     """Run trigger check for all zones."""
-    if not database.zones_collection:
+    if database.zones_collection is None:
         return
         
     zones = await database.zones_collection.find({}).to_list(length=None)

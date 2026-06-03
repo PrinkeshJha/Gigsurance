@@ -31,6 +31,7 @@ zones_collection = None
 payout_jobs_collection = None
 fraud_logs_collection = None
 alerts_collection = None
+kyc_logs_collection = None
 
 
 # -------------------------------
@@ -43,6 +44,7 @@ async def connect_to_mongo():
     global triggers_collection, premium_history_collection
     global meta_collection, delivery_logs_collection, zones_collection
     global payout_jobs_collection, fraud_logs_collection, alerts_collection
+    global kyc_logs_collection
 
     try:
         client = AsyncIOMotorClient(
@@ -68,6 +70,7 @@ async def connect_to_mongo():
         payout_jobs_collection = db["payout_jobs"]
         fraud_logs_collection = db["fraud_logs"]
         alerts_collection = db["alerts"]
+        kyc_logs_collection = db["kyc_logs"]
 
         # Ping DB
         await client.admin.command("ping")
@@ -137,6 +140,12 @@ def get_meta_collection():
     return meta_collection
 
 
+def get_kyc_logs_collection():
+    if kyc_logs_collection is None:
+        raise RuntimeError("kyc_logs_collection not initialized")
+    return kyc_logs_collection
+
+
 # -------------------------------
 # INDEXES
 # -------------------------------
@@ -146,6 +155,32 @@ async def create_indexes():
             [("email", 1)],
             name="user_email_unique_idx",
             unique=True
+        )
+
+        await users_collection.create_index(
+            [("pan", 1)],
+            name="user_pan_unique_idx",
+            unique=True
+        )
+
+        await users_collection.create_index(
+            [("kyc_status", 1)],
+            name="user_kyc_status_idx"
+        )
+
+        await users_collection.create_index(
+            [("role", 1)],
+            name="user_role_idx"
+        )
+
+        await kyc_logs_collection.create_index(
+            [("user_id", 1)],
+            name="kyc_logs_user_id_idx"
+        )
+
+        await kyc_logs_collection.create_index(
+            [("user_id", 1), ("created_at", -1)],
+            name="kyc_logs_user_created_idx"
         )
 
         await policies_collection.create_index(

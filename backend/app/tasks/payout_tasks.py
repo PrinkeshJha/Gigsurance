@@ -42,11 +42,11 @@ async def _process_payout_async(user_id_str: str, trigger_id_str: str, trigger_d
             
         policy = await database.policies_collection.find_one({
             "user_id": str(user_id),
-            "status": "active"
+            "status": {"$in": ["active", "pending_kyc"]}
         })
         
         if not policy:
-            await _update_job_status(user_id, trigger_id, "failed", "No active policy")
+            await _update_job_status(user_id, trigger_id, "failed", "No active or pending_kyc policy")
             return
             
         # Extract features for ML model (mocked metrics for now)
@@ -105,6 +105,11 @@ async def _process_payout_async(user_id_str: str, trigger_id_str: str, trigger_d
             return
             
         # Store Payout
+        is_kyc_pending = (user.get("kyc_status", "uninitiated") != "verified")
+        payout_status = "credited" if final_fraud_status == "passed" else "pending"
+        if final_fraud_status == "passed" and is_kyc_pending:
+            payout_status = "pending_kyc"
+
         await database.payouts_collection.insert_one({
             "user_id": user_id,
             "policy_id": policy["_id"],
@@ -113,7 +118,7 @@ async def _process_payout_async(user_id_str: str, trigger_id_str: str, trigger_d
             "amount": payout_amount,
             "lost_hours": lost_hours,
             "trigger_type": trigger_data.get("type"),
-            "status": "credited" if final_fraud_status == "passed" else "pending",
+            "status": payout_status,
             "fraud_status": final_fraud_status,
             "reason": reason,
             "created_at": datetime.utcnow()
@@ -127,13 +132,22 @@ async def _process_payout_async(user_id_str: str, trigger_id_str: str, trigger_d
         
         # Notifications
         if final_fraud_status == "passed":
-            await database.notifications_collection.insert_one({
-                "user_id": user_id,
-                "message": f"₹{payout_amount} credited due to {trigger_data.get('type')} in {trigger_data.get('zone_name', 'your zone')}",
-                "type": "payout",
-                "read": False,
-                "created_at": datetime.utcnow()
-            })
+            if is_kyc_pending:
+                await database.notifications_collection.insert_one({
+                    "user_id": user_id,
+                    "message": f"A payout of ₹{payout_amount} is pending KYC verification. Please complete KYC to release it.",
+                    "type": "kyc_alert",
+                    "read": False,
+                    "created_at": datetime.utcnow()
+                })
+            else:
+                await database.notifications_collection.insert_one({
+                    "user_id": user_id,
+                    "message": f"₹{payout_amount} credited due to {trigger_data.get('type')} in {trigger_data.get('zone_name', 'your zone')}",
+                    "type": "payout",
+                    "read": False,
+                    "created_at": datetime.utcnow()
+                })
             
         await _update_job_status(user_id, trigger_id, "completed", "Success")
         
