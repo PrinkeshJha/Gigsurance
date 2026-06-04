@@ -2,7 +2,7 @@ import asyncio
 from datetime import datetime
 from bson import ObjectId
 import logging
-from celery import shared_task
+
 from app.celery_app import celery_app
 from app.db.database import connect_to_mongo, close_mongo_connection
 import app.db.database as database
