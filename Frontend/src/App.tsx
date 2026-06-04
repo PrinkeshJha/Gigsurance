@@ -26,6 +26,9 @@ import NotificationsPage from "./pages/NotificationsPage";
 import PaymentsPage from "./pages/PaymentsPage";
 import TriggersPage from "./pages/TriggersPage";
 import AdminPage from "./pages/AdminPage";
+import WalletPage from "./pages/WalletPage";
+import TrackingPage from "./pages/TrackingPage";
+import GeospatialPage from "./pages/GeospatialPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -220,6 +223,14 @@ const router = createBrowserRouter(
             </ProtectedRoute>
           ),
         },
+        {
+          path: "/wallet",
+          element: (
+            <ProtectedRoute>
+              <WalletPage />
+            </ProtectedRoute>
+          ),
+        },
 
         /* 🛡️ ADMIN */
         {
@@ -227,6 +238,22 @@ const router = createBrowserRouter(
           element: (
             <ProtectedRoute requiredRole="admin">
               <AdminPage />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/admin/tracking",
+          element: (
+            <ProtectedRoute requiredRole="admin">
+              <TrackingPage />
+            </ProtectedRoute>
+          ),
+        },
+        {
+          path: "/admin/geospatial",
+          element: (
+            <ProtectedRoute requiredRole="admin">
+              <GeospatialPage />
             </ProtectedRoute>
           ),
         },

@@ -26,6 +26,9 @@ from app.routes.zone import router as zone_router
 from app.routes.payout_jobs import router as payout_jobs_router
 from app.routes.alerts import router as alerts_router
 from app.routes.kyc import router as kyc_router
+from app.routes.wallet import router as wallet_router
+from app.routes.tracking import router as tracking_router
+from app.routes.geo_analytics import router as geo_analytics_router
 
 import app.db.database as database
 from app.scheduler import init_scheduler, start_scheduler, shutdown_scheduler
@@ -176,6 +179,9 @@ app.include_router(delivery_router) # Uses internal prefix
 app.include_router(zone_router) # Uses internal prefix
 app.include_router(payout_jobs_router) # Uses internal prefix
 app.include_router(alerts_router) # Uses internal prefix
+app.include_router(wallet_router)
+app.include_router(tracking_router)
+app.include_router(geo_analytics_router)
 
 # ===============================
 

@@ -41,11 +41,14 @@ async def release_pending_kyc_payouts(user_id_str: str):
             "status": "pending_kyc"
         }).to_list(length=None)
 
+        from app.services.wallet_service import credit_pending
         for payout in pending_payouts:
             await payouts_collection.update_one(
                 {"_id": payout["_id"]},
                 {"$set": {"status": "credited", "updated_at": now}}
             )
+
+            await credit_pending(user_id_str, payout["amount"], str(payout["_id"]), payout.get("trigger_type", "payout"))
 
             await notifications_collection.insert_one({
                 "user_id": user_id_str,
@@ -107,6 +110,10 @@ async def submit_kyc(payload: KycSubmitRequest, user: dict = Depends(get_current
                 {"user_id": user_id_str, "status": "pending_kyc"},
                 {"$set": {"status": "active", "updated_at": now}}
             )
+
+            # Auto-create wallet upon KYC approval
+            from app.services.wallet_service import create_wallet
+            await create_wallet(user_id_str)
 
             # Log
             await kyc_logs_collection.insert_one({
@@ -289,6 +296,10 @@ async def kyc_action(payload: KycActionRequest, admin: dict = Depends(check_role
                 {"user_id": target_user_id_str, "status": "pending_kyc"},
                 {"$set": {"status": "active", "updated_at": now}}
             )
+
+            # Auto-create wallet upon KYC approval
+            from app.services.wallet_service import create_wallet
+            await create_wallet(target_user_id_str)
 
             # Log
             await kyc_logs_collection.insert_one({

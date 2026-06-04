@@ -63,6 +63,16 @@ def init_scheduler():
         replace_existing=True
     )
 
+    # Wallet pending balance maturity release every 10 minutes
+    from app.services.wallet_service import release_pending_balances
+    scheduler.add_job(
+        release_pending_balances,
+        trigger=IntervalTrigger(minutes=10),
+        id="release_matured_balances",
+        max_instances=1,
+        replace_existing=True
+    )
+
     # ❌ removed noisy log
 
 

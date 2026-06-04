@@ -367,3 +367,103 @@ const res = await api.post('/payments/verify', data);
 return res.data;
 },
 };
+
+/* ================= WALLET ================= */
+
+export const walletAPI = {
+  getWallet: async () => {
+    const res = await api.get('/wallet/me');
+    return res.data;
+  },
+  getTransactions: async () => {
+    const res = await api.get('/wallet/me/transactions');
+    return res.data;
+  },
+  withdraw: async (data: { amount: number; destination_details: any }) => {
+    const res = await api.post('/wallet/withdraw', data);
+    return res.data;
+  },
+  getWithdrawals: async () => {
+    const res = await api.get('/wallet/me/withdrawals');
+    return res.data;
+  },
+  getAdminWallets: async () => {
+    const res = await api.get('/admin/wallets');
+    return res.data;
+  },
+  getAdminWithdrawals: async () => {
+    const res = await api.get('/admin/withdrawals');
+    return res.data;
+  },
+  approveWithdrawal: async (id: string) => {
+    const res = await api.patch(`/admin/withdrawals/${id}/approve`);
+    return res.data;
+  },
+  rejectWithdrawal: async (id: string, reason: string) => {
+    const res = await api.patch(`/admin/withdrawals/${id}/reject`, { reason });
+    return res.data;
+  },
+  freezeWallet: async (workerId: string, freeze: boolean) => {
+    const res = await api.post(`/admin/wallets/${workerId}/freeze`, { freeze });
+    return res.data;
+  },
+  getWalletAnalytics: async () => {
+    const res = await api.get('/admin/analytics');
+    return res.data;
+  }
+};
+
+/* ================= TRACKING ================= */
+
+export const trackingAPI = {
+  getLiveWorkers: async () => {
+    const res = await api.get('/admin/workers/live');
+    return res.data;
+  },
+  getWorkerHistory: async (id: string) => {
+    const res = await api.get(`/workers/${id}/location/history`);
+    return res.data;
+  },
+  getWorkerSessions: async (id: string) => {
+    const res = await api.get(`/workers/${id}/location/sessions`);
+    return res.data;
+  },
+  getOfflineWorkers: async (minutes: number) => {
+    const res = await api.get(`/admin/workers/offline-since/${minutes}`);
+    return res.data;
+  }
+};
+
+/* ================= GEOSPATIAL ANALYTICS ================= */
+
+export const geoAPI = {
+  getWorkerHeatmap: async () => {
+    const res = await api.get('/analytics/heatmap/workers');
+    return res.data;
+  },
+  getFraudHeatmap: async () => {
+    const res = await api.get('/analytics/heatmap/fraud');
+    return res.data;
+  },
+  getTriggerHeatmap: async () => {
+    const res = await api.get('/analytics/heatmap/triggers');
+    return res.data;
+  },
+  getPayoutHeatmap: async () => {
+    const res = await api.get('/analytics/heatmap/payouts');
+    return res.data;
+  },
+  getZoneStats: async (id: string) => {
+    const res = await api.get(`/analytics/geo-zones/${id}/stats`);
+    return res.data;
+  },
+  getWorkerClusters: async () => {
+    const res = await api.get('/analytics/workers/clusters');
+    return res.data;
+  },
+  getAllZones: async () => {
+    const res = await api.get('/api/zones');
+    return res.data;
+  }
+};
+

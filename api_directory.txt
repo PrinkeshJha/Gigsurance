@@ -1,0 +1,470 @@
+========================================================================
+                     ☔ GigSurance API Directory Reference 🛡️
+========================================================================
+
+This document provides a complete catalog of all REST endpoints and WebSockets
+available in the GigSurance backend, specifying HTTP methods, paths, required 
+roles, input schemas, and expected responses.
+
+------------------------------------------------------------------------
+1. Authentication & Profile Endpoints
+------------------------------------------------------------------------
+
+* Register User
+  - Method: POST
+  - Path: /auth/register
+  - Access: Public
+  - Request Body:
+    {
+      "email": "worker@example.com",
+      "name": "Jane Doe",
+      "mobile": "9876543210",
+      "pan": "ABCDE1234F",
+      "password": "strongpassword"
+    }
+  - Response: (200 OK)
+    {
+      "message": "User registered successfully."
+    }
+
+* Login / Token Generation
+  - Method: POST
+  - Path: /auth/login
+  - Access: Public
+  - Request Body:
+    {
+      "pan": "ABCDE1234F",
+      "password": "strongpassword"
+    }
+  - Response: (200 OK)
+    {
+      "access_token": "jwt_token_string",
+      "token_type": "bearer"
+    }
+
+* Current Session Profile
+  - Method: GET
+  - Path: /auth/me
+  - Access: Logged-in User (Bearer Token)
+  - Response: (200 OK)
+    {
+      "id": "60c72b2f9b1d8b2d88a2c263",
+      "name": "Jane Doe",
+      "email": "worker@example.com",
+      "mobile": "9876543210",
+      "pan": "ABCDE1234F",
+      "role": "user",
+      "is_onboarded": true,
+      "kyc_status": "approved"
+    }
+
+* Update Profile
+  - Method: PATCH
+  - Path: /auth/profile
+  - Access: Logged-in User
+  - Request Body: Partial JSON matching User keys (e.g. email, mobile)
+  - Response: (200 OK) Updated User profile document
+
+------------------------------------------------------------------------
+2. Onboarding & Policy Endpoints
+------------------------------------------------------------------------
+
+* Calculate Premium Rates (Risk Engine)
+  - Method: POST
+  - Path: /onboarding/calculate
+  - Access: Logged-in User
+  - Request Body:
+    {
+      "platform": "Swiggy Instamart",
+      "city": "Ahmedabad",
+      "zone": "Navrangpura",
+      "working_hours": "12-20"
+    }
+  - Response: (200 OK)
+    {
+      "risk_score": 1.25,
+      "weekly_premium": 115.00,
+      "weekly_cap": 850.00,
+      "per_delivery_deduction": 5.00
+    }
+
+* Complete Onboarding Setup
+  - Method: POST
+  - Path: /onboarding/complete
+  - Access: Logged-in User
+  - Request Body: Onboarding configuration details + calculated risk values
+  - Response: (200 OK)
+    {
+      "status": "success",
+      "message": "Onboarding completed successfully."
+    }
+
+* Retrieve Active Policy
+  - Method: GET
+  - Path: /policy/me
+  - Access: Logged-in User
+  - Response: (200 OK)
+    {
+      "id": "policy_id_string",
+      "status": "pending_kyc",  // or "active", "paused"
+      "coverage_amount": 50000.00,
+      "weekly_premium": 115.00,
+      "risk_score": 1.25
+    }
+
+* Toggle Coverage State
+  - Method: POST
+  - Path: /policy/toggle
+  - Access: Logged-in User
+  - Request Body:
+    {
+      "active": false  // true to resume, false to pause
+    }
+  - Response: (200 OK) Updated Policy details
+
+------------------------------------------------------------------------
+3. Wallet, Ledger & Withdrawal Endpoints
+------------------------------------------------------------------------
+
+* Get My Wallet Details
+  - Method: GET
+  - Path: /wallet/me
+  - Access: Logged-in User
+  - Response: (200 OK)
+    {
+      "wallet_id": "60c72b2f9b1d8b2d88a2c270",
+      "available_balance": 1500.00,
+      "pending_balance": 500.00,
+      "status": "active"  // or "frozen"
+    }
+
+* Get My Transaction Ledger Logs
+  - Method: GET
+  - Path: /wallet/me/transactions
+  - Access: Logged-in User
+  - Response: (200 OK) Array of ledger transactions
+    [
+      {
+        "id": "tx_id_1",
+        "type": "credit_pending",
+        "amount": 500.00,
+        "running_available": 1500.00,
+        "running_pending": 500.00,
+        "description": "Payout for trigger weather-heat-delhi",
+        "created_at": "2026-06-04T12:00:00Z"
+      }
+    ]
+
+* Get My Withdrawals List
+  - Method: GET
+  - Path: /wallet/me/withdrawals
+  - Access: Logged-in User
+  - Response: (200 OK) Array of withdrawal requests
+
+* Request Balance Withdrawal (Cashout)
+  - Method: POST
+  - Path: /wallet/withdraw
+  - Access: Worker Role
+  - Request Body:
+    {
+      "amount": 2500.00,
+      "destination_details": {
+        "upi_id": "worker@upi"  // or {"bank_account": "...", "ifsc": "..."}
+      }
+    }
+  - Response: (201 Created)
+    {
+      "withdrawal_id": "withdrawal_request_id",
+      "status": "pending_approval",  // "completed" if <= 10,000 auto-approved
+      "auto_approved": false,
+      "message": "Withdrawal request submitted."
+    }
+
+------------------------------------------------------------------------
+4. KYC Verification Endpoints
+------------------------------------------------------------------------
+
+* Submit KYC Verification Documents
+  - Method: POST
+  - Path: /kyc/submit
+  - Access: Logged-in User
+  - Request Body:
+    {
+      "document_type": "PAN",
+      "document_number": "ABCDE1234F",
+      "image_url": "http://example.com/pan.jpg"
+    }
+  - Response: (200 OK)
+    {
+      "kyc_id": "kyc_log_id",
+      "status": "approved", // auto-approves if number is valid format
+      "message": "KYC verification completed."
+    }
+
+* Retrieve KYC Log Status
+  - Method: GET
+  - Path: /kyc/status
+  - Access: Logged-in User
+  - Response: (200 OK) Current KYC log document containing review details
+
+------------------------------------------------------------------------
+5. Premium Payments & Deliveries
+------------------------------------------------------------------------
+
+* Record Delivery Micro-Deduction
+  - Method: POST
+  - Path: /subscription/record-delivery
+  - Access: Logged-in User
+  - Request Body:
+    {
+      "delivery_id": "del-12345",
+      "timestamp": "2026-06-04T18:00:00Z"
+    }
+  - Response: (200 OK)
+    {
+      "status": "success",
+      "deducted_amount": 5.00,
+      "weekly_accumulated": 45.00,
+      "premium_cap_reached": false
+    }
+
+* Get Weekly Premium Cap Status
+  - Method: GET
+  - Path: /subscription/status
+  - Access: Logged-in User
+  - Response: (200 OK) Premium counters and status details
+
+* Create Razorpay Payment Order
+  - Method: POST
+  - Path: /payments/create-order
+  - Access: Logged-in User
+  - Request Body:
+    {
+      "amount": 115.00
+    }
+  - Response: (200 OK) Razorpay order payload (ID, key, currency)
+
+* Confirm Razorpay Payment Signature
+  - Method: POST
+  - Path: /payments/verify
+  - Access: Logged-in User
+  - Request Body: Razorpay signature verification attributes
+  - Response: (200 OK) Verification outcome
+
+------------------------------------------------------------------------
+6. Parametric Triggers & Alerts
+------------------------------------------------------------------------
+
+* Get Active Trigger Alerts
+  - Method: GET
+  - Path: /triggers/live
+  - Access: Logged-in User
+  - Response: (200 OK) Number of currently active weather warnings in user's zone
+
+* Get Historical Parametric Triggers
+  - Method: GET
+  - Path: /triggers/all
+  - Access: Logged-in User
+  - Response: (200 OK) Array of triggers logged across all zones
+
+* Get Current Weather Telemetry
+  - Method: GET
+  - Path: /weather/{zone}
+  - Access: Logged-in User
+  - Response: (200 OK) Current atmospheric logs
+
+* Get Future Weather Forecast Alert
+  - Method: GET
+  - Path: /alerts/forecast/{zone}
+  - Access: Logged-in User
+  - Response: (200 OK) 48h predictive alerts
+
+* Get Active Parametric Zones
+  - Method: GET
+  - Path: /api/zones
+  - Access: Public
+  - Response: (200 OK)
+    {
+      "status": "success",
+      "data": [
+        {
+          "id": "zone_object_id",
+          "name": "Navrangpura",
+          "center": {"lat": 23.0225, "lon": 72.5714},
+          "radius_km": 5.0
+        }
+      ]
+    }
+
+------------------------------------------------------------------------
+7. Admin & Operations Control Endpoints
+------------------------------------------------------------------------
+
+* Retrieve Global Users list
+  - Method: GET
+  - Path: /admin/users
+  - Access: Admin / Ops
+  - Response: (200 OK) List of user profiles
+
+* Get KYC Submissions Pending Review
+  - Method: GET
+  - Path: /kyc/review
+  - Access: Admin / Ops
+  - Response: (200 OK) Array of pending KYC review entries
+
+* Process KYC Approval
+  - Method: POST
+  - Path: /kyc/{kyc_id}/approve
+  - Access: Admin / Ops
+  - Response: (200 OK) Action result
+
+* Process KYC Rejection
+  - Method: POST
+  - Path: /kyc/{kyc_id}/reject
+  - Access: Admin / Ops
+  - Request Body:
+    {
+      "reason": "Document blur and unreadable"
+    }
+  - Response: (200 OK) Action result
+
+* List All Registered Wallets
+  - Method: GET
+  - Path: /admin/wallets
+  - Access: Admin / Ops
+  - Response: (200 OK) Array of all worker wallet balances
+
+* Freeze / Unfreeze a Wallet
+  - Method: POST
+  - Path: /admin/wallets/{worker_id}/freeze
+  - Access: Admin / Ops
+  - Request Body:
+    {
+      "freeze": true  // true to lock, false to unlock
+    }
+  - Response: (200 OK) Updated wallet status
+
+* List Pending Cashout Requests
+  - Method: GET
+  - Path: /admin/withdrawals
+  - Access: Admin / Ops
+  - Response: (200 OK) Array of pending withdrawal cashout logs
+
+* Approve Pending Cashout Request
+  - Method: PATCH
+  - Path: /admin/withdrawals/{id}/approve
+  - Access: Admin / Ops
+  - Response: (200 OK) Payout result
+
+* Reject Pending Cashout Request
+  - Method: PATCH
+  - Path: /admin/withdrawals/{id}/reject
+  - Access: Admin / Ops
+  - Request Body:
+    {
+      "reason": "Mismatch in UPI ID owner name"
+    }
+  - Response: (200 OK) Action result
+
+------------------------------------------------------------------------
+8. Live GPS Tracking & Geospatial Analytics
+------------------------------------------------------------------------
+
+* Get Active Online Workers Coordinates
+  - Method: GET
+  - Path: /admin/workers/live
+  - Access: Admin / Ops
+  - Response: (200 OK) Array of online worker locations (name, lat, lon)
+
+* Get Selected Worker Historical Route Coordinates
+  - Method: GET
+  - Path: /workers/{id}/location/history
+  - Access: Admin / Ops
+  - Response: (200 OK) Chronological coordinate logs for playback replay
+
+* Get Selected Worker Route Session list
+  - Method: GET
+  - Path: /workers/{id}/location/sessions
+  - Access: Admin / Ops
+  - Response: (200 OK) List of session IDs
+
+* Get Offline Roster (Offline since X minutes)
+  - Method: GET
+  - Path: /admin/workers/offline-since/{minutes}
+  - Access: Admin / Ops
+  - Response: (200 OK) Roster of workers offline longer than threshold
+
+* Get Worker Density Heatmap points
+  - Method: GET
+  - Path: /analytics/heatmap/workers
+  - Access: Admin / Ops
+  - Response: (200 OK) List of coordinates and weights
+
+* Get Fraud Hotspots (Suspicious Spoofing Anomalies)
+  - Method: GET
+  - Path: /analytics/heatmap/fraud
+  - Access: Admin / Ops
+  - Response: (200 OK) Coordinates with ML fraud score weights
+
+* Get Parametric Triggers Activity Hotspots
+  - Method: GET
+  - Path: /analytics/heatmap/triggers
+  - Access: Admin / Ops
+  - Response: (200 OK) Center locations of triggered grids
+
+* Get Insurance Payout Distribution Hotspots
+  - Method: GET
+  - Path: /analytics/heatmap/payouts
+  - Access: Admin / Ops
+  - Response: (200 OK) Coordinates with aggregate payout weights
+
+* Run K-Means Spatial Clustering Analytics
+  - Method: GET
+  - Path: /analytics/workers/clusters
+  - Access: Admin / Ops
+  - Response: (200 OK) Centroid coordinates and size of clustered worker groups
+
+* Get Real-time Statistics for Specific zone
+  - Method: GET
+  - Path: /analytics/geo-zones/{id}/stats
+  - Access: Admin / Ops
+  - Response: (200 OK)
+    {
+      "zone_id": "zone_id",
+      "total_workers": 24,
+      "active_triggers_count": 2,
+      "total_payout_amount": 12500.00,
+      "payouts_count": 15
+    }
+
+------------------------------------------------------------------------
+9. Real-time WebSocket Channels
+------------------------------------------------------------------------
+
+* Worker GPS Stream Client
+  - WebSocket URL: ws://<host>/ws/worker/location?token=<jwt_token>
+  - Mode: Write-Only (Uploads GPS coordinates)
+  - Client Upload Message Format:
+    {
+      "latitude": 23.0225,
+      "longitude": 72.5714,
+      "session_id": "session-unique-key",
+      "is_online": true
+    }
+
+* Admin Live Map Dashboard
+  - WebSocket URL: ws://<host>/ws/admin/live-map?token=<jwt_token>
+  - Mode: Read-Only (Receives live updates)
+  - Broadcast Event Messages Format:
+    {
+      "event": "worker_location_update",
+      "data": {
+        "user_id": "60c72b2f9b1d8b2d88a2c263",
+        "name": "Jane Doe",
+        "latitude": 23.0225,
+        "longitude": 72.5714,
+        "is_online": true,
+        "updated_at": "2026-06-04T18:00:00Z"
+      }
+    }
+========================================================================

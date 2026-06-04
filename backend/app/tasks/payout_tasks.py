@@ -110,7 +110,7 @@ async def _process_payout_async(user_id_str: str, trigger_id_str: str, trigger_d
         if final_fraud_status == "passed" and is_kyc_pending:
             payout_status = "pending_kyc"
 
-        await database.payouts_collection.insert_one({
+        payout_res = await database.payouts_collection.insert_one({
             "user_id": user_id,
             "policy_id": policy["_id"],
             "trigger_id": trigger_id,
@@ -123,6 +123,10 @@ async def _process_payout_async(user_id_str: str, trigger_id_str: str, trigger_d
             "reason": reason,
             "created_at": datetime.utcnow()
         })
+        
+        if payout_status == "credited":
+            from app.services.wallet_service import credit_pending
+            await credit_pending(user_id_str, payout_amount, str(payout_res.inserted_id), trigger_data.get("type", "payout"))
         
         # Update user stats
         await database.users_collection.update_one(

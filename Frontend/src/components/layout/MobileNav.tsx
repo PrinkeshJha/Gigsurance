@@ -3,12 +3,14 @@ import { useAuth } from '@/hooks/useAuth';
 import {
   LayoutDashboard, Activity, FileText, History, BarChart3,
   User, Bell, CreditCard, Zap, ShieldCheck, Menu, X, LogOut, Shield,
+  Wallet, Navigation, Globe,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
 const links = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/wallet', label: 'Wallet', icon: Wallet },
   { to: '/monitor', label: 'Monitor', icon: Activity },
   { to: '/policy', label: 'Policy', icon: FileText },
   { to: '/history', label: 'History', icon: History },
@@ -26,7 +28,14 @@ const MobileNav = () => {
 
   if (!user?.is_onboarded) return null;
 
-  const allLinks = user.role === 'admin' ? [...links, { to: '/admin', label: 'Admin', icon: ShieldCheck }] : links;
+  const allLinks = user.role === 'admin' 
+    ? [
+        ...links, 
+        { to: '/admin', label: 'Admin', icon: ShieldCheck },
+        { to: '/admin/tracking', label: 'Live Tracking', icon: Navigation },
+        { to: '/admin/geospatial', label: 'Geo Analytics', icon: Globe }
+      ] 
+    : links;
 
   return (
     <div className="md:hidden">

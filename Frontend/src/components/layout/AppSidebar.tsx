@@ -3,12 +3,14 @@ import { useAuth } from '@/hooks/useAuth';
 import {
   LayoutDashboard, Activity, FileText, History, BarChart3,
   User, Bell, CreditCard, Zap, ShieldCheck, LogOut, ChevronLeft, ChevronRight,
+  Wallet, Navigation, Globe,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
 const userLinks = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/wallet', label: 'Wallet', icon: Wallet },
   { to: '/monitor', label: 'Monitor', icon: Activity },
   { to: '/policy', label: 'Policy', icon: FileText },
   { to: '/history', label: 'History', icon: History },
@@ -21,6 +23,8 @@ const userLinks = [
 
 const adminLinks = [
   { to: '/admin', label: 'Admin Panel', icon: ShieldCheck },
+  { to: '/admin/tracking', label: 'Live Tracking', icon: Navigation },
+  { to: '/admin/geospatial', label: 'Geo Analytics', icon: Globe },
 ];
 
 const AppSidebar = () => {

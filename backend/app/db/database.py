@@ -32,6 +32,9 @@ payout_jobs_collection = None
 fraud_logs_collection = None
 alerts_collection = None
 kyc_logs_collection = None
+wallets_collection = None
+wallet_transactions_collection = None
+withdrawal_requests_collection = None
 
 
 # -------------------------------
@@ -45,6 +48,7 @@ async def connect_to_mongo():
     global meta_collection, delivery_logs_collection, zones_collection
     global payout_jobs_collection, fraud_logs_collection, alerts_collection
     global kyc_logs_collection
+    global wallets_collection, wallet_transactions_collection, withdrawal_requests_collection
 
     try:
         client = AsyncIOMotorClient(
@@ -71,6 +75,9 @@ async def connect_to_mongo():
         fraud_logs_collection = db["fraud_logs"]
         alerts_collection = db["alerts"]
         kyc_logs_collection = db["kyc_logs"]
+        wallets_collection = db["wallets"]
+        wallet_transactions_collection = db["wallet_transactions"]
+        withdrawal_requests_collection = db["withdrawal_requests"]
 
         # Ping DB
         await client.admin.command("ping")
@@ -144,6 +151,24 @@ def get_kyc_logs_collection():
     if kyc_logs_collection is None:
         raise RuntimeError("kyc_logs_collection not initialized")
     return kyc_logs_collection
+
+
+def get_wallets_collection():
+    if wallets_collection is None:
+        raise RuntimeError("wallets_collection not initialized")
+    return wallets_collection
+
+
+def get_wallet_transactions_collection():
+    if wallet_transactions_collection is None:
+        raise RuntimeError("wallet_transactions_collection not initialized")
+    return wallet_transactions_collection
+
+
+def get_withdrawal_requests_collection():
+    if withdrawal_requests_collection is None:
+        raise RuntimeError("withdrawal_requests_collection not initialized")
+    return withdrawal_requests_collection
 
 
 # -------------------------------
@@ -235,6 +260,33 @@ async def create_indexes():
         await notifications_collection.create_index(
             [("user_id", 1), ("read", 1)],
             name="notification_user_read_idx"
+        )
+
+        # Wallet System Indexes
+        await wallets_collection.create_index(
+            [("user_id", 1)],
+            name="wallet_user_id_unique_idx",
+            unique=True
+        )
+
+        await wallet_transactions_collection.create_index(
+            [("user_id", 1), ("created_at", -1)],
+            name="wallet_tx_user_created_idx"
+        )
+
+        await wallet_transactions_collection.create_index(
+            [("reference_id", 1)],
+            name="wallet_tx_ref_idx"
+        )
+
+        await withdrawal_requests_collection.create_index(
+            [("user_id", 1)],
+            name="withdrawal_user_idx"
+        )
+
+        await withdrawal_requests_collection.create_index(
+            [("status", 1)],
+            name="withdrawal_status_idx"
         )
 
     except Exception as e:

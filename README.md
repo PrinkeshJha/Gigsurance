@@ -28,7 +28,7 @@
 - [API Reference](#-api-reference)
 - [Testing](#-testing)
 - [Current Implementation Status](#-current-implementation-status)
-- [Deployment](#-deployment)
+- [Deployment Guide](#-deployment-guide)
 - [Contributing](#-contributing)
 
 ---
@@ -61,35 +61,37 @@ Traditional insurance is completely broken for this demographic. Filing claims f
                          |
          +--------------+-+------------------+
          |  Backend API (FastAPI)            |
-         |  +- Auth Routes                   |
+         |  +- Auth & KYC Routes             |
          |  +- Policy & Subscription Routes  |
          |  +- Live Weather & Trigger Routes |
          |  +- Payments (Razorpay)           |
-         |  +- Admin & Location Routes       |
+         |  +- Wallet & Ledger Routes        |
+         |  +- WebSockets Live GPS Tracking  |
          +----------+----------+-----------+
                     |          |
-       +-----------+--+   +---+------------+
-       |  MongoDB     |   |  External APIs |
-       | (Motor Async)|   |  +- OpenWeather|
-       |              |   |  +- NewsAPI    |
-       | Collections: |   |  +- Razorpay   |
-       | . users      |   +----------------+
-       | . policies   |
-       | . triggers   |         +----------------------------------+
-       | . payouts    |         |  Background Jobs (APScheduler)   |
-       | . sub/logs   |         |  . Trigger Engine (every 10 min) |
-       +--------------+         |  . Forecast Alerts (every 6 hrs) |
-                                +----------------+-----------------+
-                                                 |
-                                      Async Task Dispatch (Redis)
-                                                 |
-                                                 v
-                                +----------------------------------+
-                                |    Celery Distributed Workers    |
-                                |  . ML-based Fraud Checks         |
-                                |  . GPS/Location Validation       |
-                                |  . Proportional Payout Engine    |
-                                +----------------------------------+
+        +-----------+--+   +---+------------+
+        |  MongoDB     |   |  External APIs |
+        | (Motor Async)|   |  +- OpenWeather|
+        |              |   |  +- NewsAPI    |
+        | Collections: |   |  +- Razorpay   |
+        | . users      |   +----------------+
+        | . policies   |
+        | . triggers   |         +----------------------------------+
+        | . payouts    |         |  Background Jobs (APScheduler)   |
+        | . wallets    |         |  . Trigger Engine (every 10 min) |
+        | . locations  |         |  . Forecast Alerts (every 6 hrs) |
+        +--------------+         |  . Maturity Release (10 min job) |
+                                 +----------------+-----------------+
+                                                  |
+                                       Async Task Dispatch (Redis)
+                                                  |
+                                                  v
+                                 +----------------------------------+
+                                 |    Celery Distributed Workers    |
+                                 |  . ML-based Fraud Checks         |
+                                 |  . GPS/Location Validation       |
+                                 |  . Proportional Payout Engine    |
+                                 +----------------------------------+
 ```
 
 ---
@@ -98,15 +100,18 @@ Traditional insurance is completely broken for this demographic. Filing claims f
 
 ### 🛵 For Gig Workers
 - **Onboarding Setup**: Set up your delivery platform, working city/zone, and scheduled shift hours to calculate a personalized risk score.
-- **Premium Subscription**: Choose to pay weekly premiums via Razorpay, or leverage micro-deductions (deducting small amounts per delivery) up to the weekly cap.
+- **KYC Verification**: Submit PAN card image and number for automated masking, format validation, and instant verification reviews.
+- **Micro-Deductions**: Pay weekly premiums dynamically via pay-as-you-go delivery deductions up to your cap limit.
 - **Real-Time Monitoring**: Interactive dashboard mapping current weather conditions, active triggers, and risk alerts for the worker's specific zone.
-- **Instant Automated Payouts**: Direct deposit logs with detailed summaries showing weather metrics or news headlines that triggered the credit.
+- **Unified Wallet System**: Tracks Available vs. Pending balances. Workers can submit cashout requests (UPI vs. Bank Account) that auto-approve up to ₹10,000.
 - **Notifications Hub**: Push alerts notifying workers of payouts or predictive weather warnings (next 48 hours).
 
-### 👔 For Admins
-- **KPI Metrics Dashboard**: Tracks active policies, total premiums collected vs. payouts distributed, and claims ratios.
-- **Fraud Control Center**: Real-time access to geolocation verification results and ML Isolation Forest anomaly logs.
-- **Active Trigger Feed**: Complete historical and active record of weather and civil triggers across all zones.
+### 👔 For Admins & Operations
+- **Live Worker GPS Map**: Interactive dark-themed map layer showing online workers with real-time pulsing markers. Includes **Trip Session Replay** with speed play/pause multipliers to track historical delivery routes.
+- **Geospatial Heatmaps**: Overlay layers visualizing **Worker Density**, **Fraud Hotspots**, **Weather Triggers**, and **Payout Distribution**.
+- **K-Means Clustering**: Mapped indigo-colored spatial worker centroids showing coordinates and group sizes.
+- **Interactive Zone Analytics**: Click/hover parametric zone outlines to inspect active triggers, total payouts, and active worker count.
+- **Ops Dashboard**: Review and approve high-value cashout requests (> ₹10,000) and toggle wallet freeze states to protect insurance pools.
 
 ---
 
@@ -116,7 +121,7 @@ Traditional insurance is completely broken for this demographic. Filing claims f
 - **Core Framework**: FastAPI (high-performance async endpoints)
 - **Task Queue**: Celery 5.4.0 (offloads heavy validation and processing)
 - **Message Broker & Result Store**: Redis 5.0.0
-- **Background Scheduler**: APScheduler 3.10.0 (handles weather polling and weekly resets)
+- **Background Scheduler**: APScheduler 3.10.0 (handles weather polling, resets, and wallet maturity)
 - **Database Driver**: Motor (async wrapper for MongoDB)
 - **Machine Learning**: Scikit-learn (RandomForest for risk scoring, Isolation Forest for fraud checks) + Joblib
 - **Payments**: Razorpay SDK
@@ -125,6 +130,7 @@ Traditional insurance is completely broken for this demographic. Filing claims f
 ### Frontend
 - **Framework**: React 18 + Vite (TypeScript)
 - **State & Data Fetching**: TanStack React Query + Axios
+- **Mapping Library**: Leaflet + React-Leaflet (Vite optimized layout)
 - **Styling**: Tailwind CSS + shadcn/ui (Radix UI primitives)
 - **Animations**: Framer Motion
 - **Charts**: Recharts
@@ -143,6 +149,10 @@ Here is a summary of how we store our data in MongoDB:
 - `fraud_logs` & `payout_jobs`: Celery background job logs and ML anomaly detection details.
 - `zones` & `meta_locations`: Geospatial zone definitions and city coordinates.
 - `alerts` & `delivery_logs`: 48-hour forecast alerts and micro-deduction transaction logs.
+- `wallets`: Available balances, pending balances, status, and double-entry transaction ledgers.
+- `wallet_transactions`: Chronological ledger entries tracking credits, holds, releases, and refunds.
+- `withdrawal_requests`: Cashout details, reviewer logs, status, and bank/UPI destination fields.
+- `worker_locations` & `location_history`: Live coordinates, online status, and historical logs with TTL indices.
 
 ---
 
@@ -162,9 +172,7 @@ Once a trigger is logged, a Celery job is dispatched for every worker in the zon
 1. **GPS Verification**: Compares the worker's last updated location with the trigger coordinates. Rejects if they are too far away, or if coordinates are older than 30 minutes.
 2. **ML Fraud Check**: An `IsolationForest` model evaluates worker metrics (claims frequency, average payout rate, activity score). Suspicious claims are flagged for manual admin review.
 3. **IST Shift Adjustment**: Calculates remaining shift hours using Indian Standard Time (IST), and credits a proportional payout (`hourly_rate × remaining_shift_hours × risk_multiplier`) up to their weekly cap limit.
-
-### 4. Micro-Deductions per Delivery
-Instead of paying a lump-sum premium upfront, workers can choose pay-as-you-go coverage. Every time they log a delivery, a small fraction (`weekly_cap / expected_deliveries`) is deducted from their earnings. Once they reach their weekly cap, all subsequent deliveries are fully covered. Counters reset every Monday.
+4. **Wallet Escrow**: Deposited directly into the worker's wallet `pending_balance` under a 24-hour review window before transferring to `available_balance` via maturity task runner.
 
 ---
 
@@ -187,20 +195,25 @@ GigSurance/
 │   │   ├── deps/                # Auth dependency checks
 │   │   └── utils/               # JWT token utilities
 │   ├── scripts/
-│   │   └── train_fraud_model.py # ML training script for fraud detection
+│   │   ├── train_fraud_model.py # ML training script for fraud detection
+│   │   └── migrate_v2_schema.py # Schema upgrade database migration script
 │   ├── test_core_logic.py       # Risk and Payout verification test
 │   ├── test_fraud.py            # GPS & Location validation test
+│   ├── test_kyc_flow.py         # KYC & RBAC workflow test
+│   ├── test_wallet.py           # Wallet and transaction ledger test
+│   ├── test_tracking_analytics.py # Tracking and Geospatial analytics test
 │   └── requirements.txt         # Backend python dependencies
 │
 └── Frontend/
     ├── src/
     │   ├── main.tsx
     │   ├── App.tsx              # React entry & Route guards
-    │   ├── pages/               # Onboarding, Dashboard, Monitor, Policy, Admin, etc.
+    │   ├── pages/               # Onboarding, Dashboard, Wallet, Tracking, Geospatial, etc.
     │   ├── components/          # Layout layout components & ui primitives (shadcn)
-    │   ├── services/            # Axios API client calls & mockData fallbacks
+    │   ├── services/            # Axios API client calls & WebSocket connectors
     │   ├── hooks/               # Custom context hooks (e.g. useAuth)
     │   └── contexts/            # Theme & Authentication contexts
+    │   └── test/                # Vitest files
     ├── tailwind.config.ts
     ├── vite.config.ts
     └── package.json             # Node frontend dependencies
@@ -213,7 +226,7 @@ GigSurance/
 ### Prerequisites
 You will need to have these installed:
 - **Node.js 18+**
-- **Python 3.10+**
+- **Python 3.12+**
 - **MongoDB**
 - **Redis**
 
@@ -261,7 +274,7 @@ You will need to have these installed:
    ```
 2. Install dependencies:
    ```bash
-   npm install
+   npm install --legacy-peer-deps
    ```
 
 ---
@@ -300,31 +313,7 @@ To run the full application locally, you will need to open four terminal windows
 ---
 
 ## 🛣️ API Reference
-
-### 🔐 Authentication
-- `POST /auth/register`: Create user account.
-- `POST /auth/login`: Authenticate and return JWT token.
-- `GET /auth/me`: Get current user details.
-
-### 📋 Policy & Onboarding
-- `POST /onboarding/calculate`: Compute dynamic risk score and weekly premium rates.
-- `POST /onboarding/complete`: Save onboarded profile parameters and create user policy.
-- `GET /policy/me`: Retrieve active policy contracts.
-- `POST /policy/toggle`: Pause or resume active coverage.
-
-### 💸 Subscriptions & Deductions
-- `POST /subscription/record-delivery`: Charge micro-deductions for a finished delivery.
-- `GET /subscription/status`: Fetch current week's accumulated deductions and cap limits.
-- `GET /transactions`: Retrieve chronological logs of premium debits and payout credits.
-
-### 🌦️ Triggers & Alerts
-- `GET /triggers/live`: Fetch count of currently active alerts in the user's city.
-- `GET /triggers/all`: Retrieve history logs of all environmental triggers.
-- `GET /weather/{zone}`: Fetch current conditions for the specific zone.
-
-### 💰 Payments
-- `POST /payments/create-order`: Initialize Razorpay payment details.
-- `POST /payments/verify`: Confirm Razorpay payment signatures.
+Refer to the detailed [api_directory.txt](file:///e:/GigSurance/api_directory.txt) file in the root directory for a comprehensive list of all backend endpoints, roles, and schema structures.
 
 ---
 
@@ -336,10 +325,19 @@ We use Pytest for our backend tests. Run them from the backend folder:
 cd backend
 .\venv\Scripts\Activate.ps1
 
-# Run core logic tests
+# Run wallet ledger tests
+python test_wallet.py
+
+# Run GPS tracking & geo analytics tests
+python test_tracking_analytics.py
+
+# Run KYC & RBAC workflow tests
+python test_kyc_flow.py
+
+# Run core calculations tests
 python test_core_logic.py
 
-# Run location/fraud tests
+# Run fraud anomaly tests
 python test_fraud.py
 ```
 
@@ -359,42 +357,71 @@ npx playwright test            # Execute End-to-end integration tests
 |---|---|---|
 | **Auth & Guards** | **100% Done** | JWT token extraction and role-based client side routing validations. |
 | **Onboarding Pipeline** | **100% Done** | Interactive workflow linked to dynamic ML-based risk scores estimation. |
+| **KYC Submission & Verification** | **100% Done** | Automated masking, format check and admin status reviews. |
 | **Background Checks** | **100% Done** | APScheduler processes coordinate logs, weather parameters, and News feeds every 10 min. |
 | **Async Task Workers** | **100% Done** | Celery handles worker queues through Redis to execute fraud checks and calculate payouts. |
 | **ML Algorithms** | **100% Done** | IsolationForest and RandomForest estimators are fully loaded and used during processing. |
 | **Payments Verification**| **100% Done** | Razorpay SDK is configured for order initialization and signature confirmation checks. |
 | **Micro-Deductions** | **100% Done** | Delivery logging processes per-delivery micro-debits up to weekly limits. |
-| **Auto-Renewal** | **Planned** | `reset_weekly_deductions` currently contains a mock block for automatically charging remaining premium balances through Razorpay. |
-| **Admin KPI Analytics** | **Partial** | Average premiums and trigger frequency metrics are partially mocked on the dashboard route. |
+| **Wallet System** | **100% Done** | Available/locked balances, ledger double entry logs, UPI/bank cashouts, admin reviewer reviews, freeze controls. |
+| **Live GPS Tracking** | **100% Done** | Websockets stream worker coordinates, Admin live map tracks online workers and reviews playback sessions. |
+| **Geospatial Analytics** | **100% Done** | Density, fraud, triggers and payouts heatmaps, spatial K-Means clustering centroid markers, zone inspectors. |
 
 ---
 
-## ☁️ Deployment
+## deployment-guide">☁️ Deployment Guide
 
-### Docker Deployment (Backend)
-Use the included Docker config to containerize the FastAPI core:
-```dockerfile
-FROM python:3.10-slim
-WORKDIR /app
-COPY backend/requirements.txt .
-RUN pip install -r requirements.txt
-COPY backend/app ./app
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
+### 🗄️ 1. Database & Cache Provisioning
+1. **MongoDB**:
+   * Create an account on [MongoDB Atlas](https://www.mongodb.com/cloud/atlas).
+   * Deploy a free shared cluster (M0) and create a database named `gigsurance`.
+   * Set up IP access lists (allowing your server IPs) and create database credentials.
+   * Secure your connection string: `mongodb+srv://<user>:<password>@cluster.mongodb.net/gigsurance`.
+2. **Redis & Message Broker**:
+   * Deploy a managed Redis server using [Upstash](https://upstash.com/) or [Redis Enterprise Cloud].
+   * Retrieve the TLS Redis URL: `rediss://:<password>@<host>:<port>`.
 
-### Frontend Deployment
-Build optimized static assets:
-```bash
-cd Frontend
-npm run build
-```
-Deploy the resulting `/dist` folder directly to hosting platforms like Vercel, Netlify, or Cloudflare Pages.
+### 🖥️ 2. Backend API Deployment (FastAPI on Render/AWS)
+To deploy the FastAPI backend to Render or AWS ECS:
+1. **Dockerfile**: The backend directory includes a production Docker setup:
+   ```dockerfile
+   FROM python:3.12-slim
+   WORKDIR /app
+   COPY requirements.txt .
+   RUN pip install --no-cache-dir -r requirements.txt
+   COPY . .
+   RUN python scripts/train_fraud_model.py
+   EXPOSE 8000
+   CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+   ```
+2. **Web Service Setup (FastAPI)**:
+   * Create a new Web Service on Render, link your GitHub repository, and choose `Docker` environment.
+   * Add env variables: `MONGO_URI`, `JWT_SECRET`, `REDIS_URL`, `OPENWEATHER_API_KEY`, etc.
+3. **Background Worker Setup (Celery)**:
+   * Create a new **Background Worker** service on Render.
+   * Choose `Docker` environment and override the run command:
+     `celery -A app.celery_app.celery_app worker --loglevel=info`
+   * Share the same Environment variables.
 
----
+### 🎨 3. Frontend Web App Deployment (Vercel/Netlify)
+1. **Build Settings**:
+   * Framework: `Vite` (Vite SPA)
+   * Build Command: `npm run build`
+   * Output Directory: `dist`
+2. **Environment Variables**:
+   * Add `VITE_API_BASE` pointing to your deployed backend URL: `https://gigsurance-api.onrender.com`.
+3. **Routing Configuration**:
+   * If deploying to Netlify, add a `_redirects` file in the `public` directory:
+     `/* /index.html 200`
+   * If deploying to Vercel, add a `vercel.json` file in the root directory:
+     ```json
+     {
+       "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+     }
+     ```
 
-## 🤝 Contributing
-1. Create a branch: `git checkout -b feature/name`.
-2. Commit changes: `git commit -m 'feat: summary description'`.
-3. Push branch: `git push origin feature/name`.
-4. Open a Pull Request against `main`.
-5. Ensure all local tests pass before requesting a review.
+### 🔒 4. Production Security Checklists
+* **SSL/TLS**: Ensure both API (`https://`) and WebSocket connections (`wss://`) run exclusively over secure sockets.
+* **CORS Settings**: Update `allow_origins` list inside `backend/app/main.py` from localhost endpoints to your production frontend domain.
+* **Secrets**: Never commit `.env` files. Store secrets securely in the hosting environment control panels.
+* **Collections Indexing**: Run `migrate_v2_schema.py` or startup commands on the production MongoDB server to initialize all geospatial `2dsphere` and user `unique` indices before taking traffic.
